@@ -1,0 +1,222 @@
+-- Overall Composite Risk Score Visual
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+from matplotlib.ticker import MaxNLocator
+
+# 2. Data Loading
+data_path = _____________\Desktop\violence project\Queries\Metrics with year\OCRS - year.csv'
+df = pd.read_csv(data_path)
+
+# 3. Data Processing
+top5 = (df[df['Overall_Composite_Risk_Score'] >= 61]
+        .nlargest(5, 'Overall_Composite_Risk_Score')
+        .sort_values('Overall_Composite_Risk_Score', ascending=True)) 
+
+# 4. Visualization
+plt.figure(figsize=(10, 5))
+colors = ['#ff5a5f' if 2015 <= y <= 2022 else '#d3d3d3' for y in top5['Year']]
+bars = plt.barh(
+    top5['case_no'].astype(str) + " (" + top5['Year'].astype(str) + ")",
+    top5['Overall_Composite_Risk_Score'],
+    color=colors,
+    height=0.6
+)
+
+# 5. Formatting
+plt.bar_label(bars, fmt='%d', padding=5)
+plt.xlabel('Risk Score', fontweight='bold')
+plt.title('Top 5 Highest-Risk Cases (2015-2022 Highlighted)', pad=20)
+plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.grid(axis='x', alpha=0.3)
+
+# 6. Save and Show
+output_file = os.path.join(os.path.expanduser('~'), 'Desktop', 'Risk_Cases_Visualization.png')
+plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
+print(f"✅ Visualization saved to:\n{output_file}")
+plt.show()
+
+
+-- Opportunity Intervention Rate Visual
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# 1. Load your data
+file_path = ____________\Desktop\violence project\Queries\Metrics with year\OIR - year.csv'
+try:
+    df = pd.read_csv(file_path)
+    print("Data loaded successfully!")
+    print("\nFirst 5 rows:")
+    print(df.head())
+except Exception as e:
+    print(f"Error loading file: {e}")
+    print("\nPlease verify:")
+    print(f"- File exists at: {file_path}")
+    print("- Correct file name (case-sensitive)")
+    print("- File is not open in another program")
+    exit()
+
+# 2. Check required columns
+required_columns = ['Year', 'Prior_Contact_Score', 'Crisis_Score', 'Leakage_Score', 'Intervention_Opportunity_Rate']
+missing_cols = [col for col in required_columns if col not in df.columns]
+if missing_cols:
+    print(f"\nERROR: Missing columns in data: {missing_cols}")
+    print("Available columns:")
+    print(df.columns.tolist())
+    exit()
+
+# 3. Get top 10 years
+top_years = df.sort_values('Intervention_Opportunity_Rate', ascending=False).head(10).copy()
+
+# 4. Calculate percentages
+components = ['Prior_Contact_Score', 'Crisis_Score', 'Leakage_Score']
+top_years[components] = top_years[components].div(top_years[components].sum(axis=1), axis=0)
+
+# 5. Plot with modern style (works without seaborn)
+plt.figure(figsize=(16, 6))  # Increased width from 12 to 16
+
+colors = ['#1f77b4', '#ff7f0e', '#d62728']
+bar_width = 1.0  # Explicitly set bar width (default is 0.8)
+bottom = np.zeros(len(top_years))
+
+for i, component in enumerate(components):
+    plt.bar(top_years['Year'], 
+            top_years[component], 
+            bottom=bottom,
+            width=bar_width,  # Controlled width
+            label=component.replace('_', ' '), 
+            color=colors[i], 
+            edgecolor='white')
+    bottom += top_years[component]
+
+# Formatting
+plt.title('Composition of Intervention Opportunity Rate\n(Top 10 Highest Years)', fontsize=14, pad=20)
+plt.xlabel('Year', fontsize=12)
+plt.ylabel('Percentage Contribution', fontsize=12)
+plt.ylim(0, 1)
+plt.gca().yaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter(1.0))
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+
+# Add percentage labels
+for year in top_years['Year']:
+    row = top_years[top_years['Year'] == year]
+    cumulative = 0
+    for component in components:
+        val = row[component].values[0]
+        if val > 0.05:  # Only label segments >5%
+            plt.text(year, cumulative + val/2, f'{val:.0%}',
+                    ha='center', va='center', color='white', fontweight='bold')
+        cumulative += val
+
+plt.xticks(top_years['Year'], rotation=45)
+plt.tight_layout()
+
+# Save and show
+output_path = ___________\Desktop\violence project\Queries\Metrics with year\OIR_composition.png'
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"\nChart saved to: {output_path}")
+plt.show()
+
+
+-- Firearm Acquisition Rate Visual
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+df = pd.read_csv(____________________\violence project\Queries\3. Performance Measurement\13a. Do certain firearm types result in higher casualties.csv')
+
+# Process top 5 firearms
+top5 = df.nlargest(5, 'Avg_Total_Victims').copy()
+top5['Firearm_Label'] = top5.apply(lambda x: f"{'Assault Rifle' if x['Firearm_Type']==3 else 'Shotgun' if x['Firearm_Type']==1 else 'Handgun' if x['Firearm_Type']==0 else 'Rifle'} ({'Legal' if x['Legal_Status']=='Legal' else 'Illegal'})", axis=1)
+
+# Create visualization
+plt.figure(figsize=(10,5))
+sns.set_style("whitegrid")
+
+# Dot plot with size = incident count
+scatter = sns.scatterplot(
+    data=top5,
+    x='Avg_Total_Victims',
+    y='Firearm_Label',
+    hue='Legal_Status',
+    size='Incident_Count',
+    sizes=(100, 1000),
+    palette={'Legal':'#1f77b4', 'Illegal':'#d62728'},
+    legend=False
+)
+
+# Annotations
+for line in range(len(top5)):
+    plt.text(top5['Avg_Total_Victims'][line]+15, 
+             line,
+             f"{top5['Avg_Total_Victims'][line]:.1f} avg victims\n({top5['Incident_Count'][line]} incidents)", 
+             horizontalalignment='left')
+
+# Formatting
+plt.title("Top 5 Most Lethal Firearm Types\n(Size = Incident Frequency)", pad=20)
+plt.xlabel("Average Total Victims per Incident")
+plt.ylabel("")
+plt.xlim(0, 400)
+plt.axvline(x=100, color='gray', linestyle='--')
+plt.text(105, 4.5, "Mass Shooting Threshold (100+ victims)", rotation=90)
+
+plt.tight_layout()
+plt.savefig('firearm_lethality_top5.png', dpi=300)
+plt.show()
+
+
+-- Motive Risk Score
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load data
+file_path = r"_______________\Desktop\violence project\Queries\Metrics with year\MRS - year.csv"
+df = pd.read_csv(file_path)
+
+# Create decade bins
+df['Decade'] = (df['Year'] // 10) * 10
+df['Decade'] = df['Decade'].astype(str) + 's'
+
+# Group by decade and calculate mean scores for each motive type
+decade_data = df.groupby('Decade')[['Hate_Motive_Score', 'Grievance_Motive_Score', 'Other_Motive_Score']].mean()
+
+# Convert scores to proportions
+decade_data = decade_data.div(decade_data.sum(axis=1), axis=0) * 100
+
+# Plot stacked bar chart
+plt.figure(figsize=(12, 6))
+colors = ['#d62728', '#1f77b4', '#ff7f0e']  # Red, Blue, Orange
+decade_data.plot(kind='bar', stacked=True, color=colors, width=0.8)
+
+plt.title('Proportion of Motive Types by Decade', fontsize=16, pad=20)
+plt.xlabel('Decade', fontsize=12)
+plt.ylabel('Proportion of Motive Score (%)', fontsize=12)
+plt.xticks(rotation=45, ha='right')
+
+# Customize legend
+plt.legend(['Hate-Based', 'Personal Grievance', 'Other Motives'], 
+           bbox_to_anchor=(1.05, 1), 
+           loc='upper left')
+
+# Add data labels
+for n, decade in enumerate(decade_data.index):
+    for i, (mot, score) in enumerate(zip(decade_data.columns, decade_data.loc[decade])):
+        if score > 5:  # Only label segments >5% for readability
+            plt.text(n, 
+                     decade_data.loc[decade][:i+1].sum() - score/2, 
+                     f'{score:.0f}%', 
+                     ha='center', 
+                     va='center',
+                     color='white' if mot == 'Hate_Motive_Score' else 'black')
+
+plt.tight_layout()
+plt.savefig('motive_proportions_by_decade.png', dpi=300, bbox_inches='tight')
+plt.show()
